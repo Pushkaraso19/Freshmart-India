@@ -13,6 +13,9 @@ export default function AccountOrders() {
   const [filter, setFilter] = useState('all')
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [reordering, setReordering] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const [cancelConfirmOrder, setCancelConfirmOrder] = useState(null)
+  const [notification, setNotification] = useState(null)
 
   useEffect(() => {
     setLoading(true)
@@ -45,6 +48,31 @@ export default function AccountOrders() {
       cod: 'fa-money-bill-wave'
     }
     return icons[method] || 'fa-credit-card'
+  }
+
+  const showNotification = (message, type = 'success') => {
+    setNotification({ message, type })
+    setTimeout(() => setNotification(null), 5000)
+  }
+
+  const handleCancelOrder = async (orderId) => {
+    setCancelling(true)
+    try {
+      const updated = await api(`/orders/${orderId}/cancel`, { method: 'PATCH' })
+      // Update local state
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: updated.status, payment_status: updated.payment_status } : o))
+      // Close both modals
+      setCancelConfirmOrder(null)
+      if (selectedOrder?.id === orderId) {
+        setSelectedOrder(null)
+      }
+      // Show success notification
+      showNotification('Order cancelled successfully! Items have been restocked.')
+    } catch (e) {
+      showNotification(e.message || 'Failed to cancel order', 'error')
+    } finally {
+      setCancelling(false)
+    }
   }
 
   const handleReorder = async (order) => {
@@ -125,6 +153,74 @@ export default function AccountOrders() {
     } finally {
       setReordering(false)
     }
+  }
+
+  const CancelConfirmModal = ({ order, onClose }) => {
+    if (!order) return null
+
+    return (
+      <div className="cancel-modal-overlay" onClick={onClose}>
+        <div className="cancel-modal-content" onClick={(e) => e.stopPropagation()}>
+          {/* Warning Icon */}
+          <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+            <div className="cancel-modal-icon">
+              <i className="fa fa-exclamation-triangle"></i>
+            </div>
+          </div>
+
+          {/* Title and Description */}
+          <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+            <h2 className="cancel-modal-title">Cancel Order?</h2>
+            <p className="cancel-modal-description">
+              Are you sure you want to cancel Order #{order.id}?
+            </p>
+          </div>
+
+          {/* Information Box */}
+          <div className="cancel-modal-info">
+            <div className="cancel-modal-info-header">
+              <i className="fa fa-info-circle"></i>
+              <p>What happens when you cancel:</p>
+            </div>
+            <ul>
+              <li>Your order will be cancelled immediately</li>
+              <li>Items will be restocked</li>
+              {order.payment_method !== 'cod' && order.payment_status === 'paid' && (
+                <li>Refund will be processed to your original payment method</li>
+              )}
+            </ul>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="cancel-modal-actions">
+            <button 
+              className="cancel-modal-btn cancel-modal-btn-secondary"
+              onClick={onClose}
+              disabled={cancelling}
+            >
+              Keep Order
+            </button>
+            <button 
+              className="cancel-modal-btn cancel-modal-btn-danger"
+              onClick={() => handleCancelOrder(order.id)}
+              disabled={cancelling}
+            >
+              {cancelling ? (
+                <>
+                  <i className="fa fa-spinner fa-spin"></i>
+                  Cancelling...
+                </>
+              ) : (
+                <>
+                  <i className="fa fa-times-circle"></i>
+                  Yes, Cancel Order
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   const OrderDetailsModal = ({ order, onClose }) => {
@@ -244,8 +340,12 @@ export default function AccountOrders() {
               </button>
             )}
             {['placed', 'processing'].includes(order.status) && (
-              <button className="btn btn-outline" style={{ margin: 0, color: '#dc2626' }}>
-                <i className="fa fa-times"></i>
+              <button 
+                className="btn-cancel-order"
+                onClick={() => setCancelConfirmOrder(order)}
+                disabled={cancelling}
+              >
+                <i className="fa fa-times-circle"></i>
                 Cancel Order
               </button>
             )}
@@ -257,11 +357,31 @@ export default function AccountOrders() {
 
   return (
     <div className="account-page">
+      {/* Notification Toast */}
+      {notification && (
+        <div className={`notification-toast notification-${notification.type}`}>
+          <div className="notification-content">
+            <i className={`fa ${notification.type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}`}></i>
+            <span>{notification.message}</span>
+          </div>
+          <button 
+            className="notification-close" 
+            onClick={() => setNotification(null)}
+            aria-label="Close notification"
+          >
+            <i className="fa fa-times"></i>
+          </button>
+        </div>
+      )}
+
       <div className="account-container">
         <div className="account-header">
           <h1>Your Orders</h1>
           <p className="subtitle">Track and manage your purchases</p>
         </div>
+
+        {/* Cancel Confirmation Modal */}
+        {cancelConfirmOrder && <CancelConfirmModal order={cancelConfirmOrder} onClose={() => setCancelConfirmOrder(null)} />}
 
         {/* Order Details Modal */}
         {selectedOrder && <OrderDetailsModal order={selectedOrder} onClose={() => setSelectedOrder(null)} />}
@@ -421,8 +541,12 @@ export default function AccountOrders() {
                     </button>
                   )}
                   {['placed', 'processing'].includes(order.status) && (
-                    <button className="btn btn-outline" style={{ margin: 0, color: '#dc2626' }}>
-                      <i className="fa fa-times"></i>
+                    <button 
+                      className="btn-cancel-order btn-cancel-order-sm"
+                      onClick={() => setCancelConfirmOrder(order)}
+                      disabled={cancelling}
+                    >
+                      <i className="fa fa-times-circle"></i>
                       Cancel
                     </button>
                   )}

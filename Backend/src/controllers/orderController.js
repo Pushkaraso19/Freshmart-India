@@ -1,4 +1,5 @@
 const pool = require('../db/pool');
+const { emitToAdmins } = require('../realtime');
 
 async function placeOrder(req, res) {
 	const { shipping_address_id = null } = req.body || {}
@@ -79,6 +80,16 @@ async function placeOrder(req, res) {
 		);
 
 		await client.query('COMMIT');
+
+		// Emit realtime event for admins
+		try {
+			// Enrich with user info for admin views
+			const { rows: userRows } = await pool.query('SELECT id, name, email FROM users WHERE id=$1', [req.user.id]);
+			emitToAdmins('order:created', { order, user: userRows[0] || { id: req.user.id } });
+		} catch (e) {
+			console.error('emit order:created failed', e);
+		}
+
 		res.status(201).json({ order });
 	} catch (err) {
 		await client.query('ROLLBACK');
@@ -186,7 +197,14 @@ async function adminUpdateOrder(req, res) {
 			values
 		);
 		if (!rows.length) return res.status(404).json({ error: 'Order not found' });
-		res.json(rows[0]);
+		const updated = rows[0];
+		// Notify admins
+		try {
+			emitToAdmins('order:updated', { order: updated });
+		} catch (e) {
+			console.error('emit order:updated failed', e);
+		}
+		res.json(updated);
 	} catch (err) {
 		console.error(err);
 		res.status(500).json({ error: 'Failed to update order' });
@@ -195,3 +213,86 @@ async function adminUpdateOrder(req, res) {
 
 module.exports.adminListOrders = adminListOrders;
 module.exports.adminUpdateOrder = adminUpdateOrder;
+
+// Customer: cancel own order (only if not shipped/delivered/cancelled)
+async function cancelOrder(req, res) {
+	const id = parseInt(req.params.id, 10);
+	if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid id' });
+
+	const client = await pool.connect();
+	try {
+		await client.query('BEGIN');
+
+		// Load order and ensure ownership
+		const { rows: orders } = await client.query(
+			`SELECT id, user_id, status, payment_method, payment_status, total_cents
+				 FROM orders WHERE id=$1 FOR UPDATE`,
+			[id]
+		);
+		if (!orders.length) {
+			await client.query('ROLLBACK');
+			return res.status(404).json({ error: 'Order not found' });
+		}
+		const order = orders[0];
+		if (order.user_id !== req.user.id) {
+			await client.query('ROLLBACK');
+			return res.status(403).json({ error: 'Not allowed to cancel this order' });
+		}
+
+		// Validate current status
+		if (!['placed', 'processing'].includes(order.status)) {
+			await client.query('ROLLBACK');
+			return res.status(400).json({ error: `Cannot cancel an order in status '${order.status}'` });
+		}
+
+		// Restore stock for all items in the order
+		const { rows: items } = await client.query(
+			`SELECT product_id, quantity FROM order_items WHERE order_id=$1`,
+			[id]
+		);
+		for (const it of items) {
+			await client.query(
+				`UPDATE products SET stock = stock + $1 WHERE id=$2`,
+				[it.quantity, it.product_id]
+			);
+		}
+
+		// If prepaid and paid, mark payment_status refunded and insert a refund transaction
+		let newPaymentStatus = order.payment_status;
+		if (order.payment_method !== 'cod' && order.payment_status === 'paid') {
+			newPaymentStatus = 'refunded';
+			await client.query(
+				`INSERT INTO transactions(order_id, user_id, amount_cents, type, method, status, reference)
+					 VALUES($1,$2,$3,'refund',$4,'completed',$5)`,
+				[order.id, req.user.id, order.total_cents, order.payment_method, `REFUND-${order.id}-${Date.now()}`]
+			);
+		}
+
+		// Update order to cancelled
+		const { rows: updated } = await client.query(
+			`UPDATE orders
+					SET status='cancelled', payment_status=COALESCE($1, payment_status), updated_at=NOW()
+				WHERE id=$2
+				RETURNING id, user_id, total_cents, status, payment_status, payment_method, created_at`,
+			[newPaymentStatus, id]
+		);
+
+		await client.query('COMMIT');
+		const ord = updated[0];
+		// Notify admins about cancellation
+		try {
+			emitToAdmins('order:updated', { order: ord });
+		} catch (e) {
+			console.error('emit order:updated (cancel) failed', e);
+		}
+		return res.json(ord);
+	} catch (err) {
+		await client.query('ROLLBACK');
+		console.error(err);
+		return res.status(500).json({ error: 'Failed to cancel order' });
+	} finally {
+		client.release();
+	}
+}
+
+module.exports.cancelOrder = cancelOrder;

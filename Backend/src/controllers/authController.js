@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const pool = require('../db/pool');
+const { emitToAdmins } = require('../realtime');
 require('../setupEnv');
 
 function signToken(user) {
@@ -23,6 +24,12 @@ async function register(req, res) {
 		);
 		const user = result.rows[0];
 		const token = signToken(user);
+		// Notify admins about new account creation
+		try {
+			emitToAdmins('user:created', { user });
+		} catch (e) {
+			console.error('emit user:created failed', e);
+		}
 		res.status(201).json({ user, token });
 	} catch (err) {
 		console.error(err);

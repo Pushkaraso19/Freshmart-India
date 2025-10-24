@@ -1,9 +1,11 @@
 const express = require('express');
+const http = require('http');
 const cors = require('cors');
 const morgan = require('morgan');
 require('./setupEnv');
 
 const routes = require('./routes');
+const { initIO } = require('./realtime');
 
 const app = express();
 
@@ -30,6 +32,11 @@ app.use((err, _req, res, _next) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+const server = http.createServer(app);
+
+// Initialize Socket.IO and attach to server
+initIO(server);
+
+server.listen(PORT, () => {
 	console.log(`Server listening on http://localhost:${PORT}`);
 });

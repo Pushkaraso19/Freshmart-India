@@ -164,7 +164,7 @@ export default function Checkout(){
                             <h4>{item.name}</h4>
                             {item.brand && <p className="item-brand">{item.brand}</p>}
                             <div className="item-pricing">
-                              <span className="item-unit-price">₹{(Number(item.price) || 0).toFixed(2)} each</span>
+                              <span className="item-unit-price">₹{(Number(item.price) || 0).toFixed(2)} / {item.unit || 'unit'}</span>
                               <span className="item-total-price">₹{((Number(item.price) || 0) * (Number(item.quantity) || 0)).toFixed(2)}</span>
                             </div>
                           </div>
@@ -366,7 +366,8 @@ export default function Checkout(){
                           <img src={item.image} alt={item.name} className="summary-item-image" />
                           <div className="summary-item-info">
                             <h4>{item.name}</h4>
-                            <p>Qty: {item.quantity} × ₹{(Number(item.price) || 0).toFixed(2)}</p>
+                            {item.unit && <p className="item-unit-meta">Unit: {item.unit}</p>}
+                            <p>Qty: {item.quantity} {item.unit ? item.unit : ''} × ₹{(Number(item.price) || 0).toFixed(2)}{item.unit ? `/${item.unit}` : ''}</p>
                           </div>
                           <span className="summary-item-price">
                             ₹{((Number(item.price) || 0) * (Number(item.quantity) || 0)).toFixed(2)}

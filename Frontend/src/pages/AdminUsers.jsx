@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
+import useAdminRealtime from '../hooks/useAdminRealtime.js'
 import '../styles/admin.css'
 
 export default function AdminUsers() {
-  const { api, user } = useAuth()
+  const { api, user, token } = useAuth()
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -13,12 +14,12 @@ export default function AdminUsers() {
   const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0 })
 
   useEffect(() => {
-    loadUsers()
+    loadUsers(true)
   }, [pagination.page])
 
-  const loadUsers = async () => {
+  const loadUsers = async (showLoading = false) => {
     try {
-      setLoading(true)
+      if (showLoading) setLoading(true)
       setError('')
       // Note: You'll need to create this endpoint on the backend
       const data = await api(`/users/admin?page=${pagination.page}&limit=${pagination.limit}`)
@@ -29,7 +30,7 @@ export default function AdminUsers() {
       // Fallback to empty array if endpoint doesn't exist yet
       setUsers([])
     } finally {
-      setLoading(false)
+      if (showLoading) setLoading(false)
     }
   }
 
@@ -65,6 +66,16 @@ export default function AdminUsers() {
     if (av > bv) return sort.dir === 'asc' ? 1 : -1
     return 0
   })
+
+  // Realtime new users
+  const handleUserCreated = useCallback(({ user: nu }) => {
+    if (pagination.page !== 1) return;
+    setUsers(prev => [nu, ...prev])
+    // Silent reconcile to include any server-side defaults
+    loadUsers(false)
+  }, [pagination.page])
+
+  useAdminRealtime({ token, onUserCreated: handleUserCreated })
 
   const updateUser = async (id, payload) => {
     try {

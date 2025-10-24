@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
+import useAdminRealtime from '../hooks/useAdminRealtime.js'
 import '../styles/admin.css'
 
 export default function AdminOrders() {
-  const { api, user } = useAuth()
+  const { api, user, token } = useAuth()
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -12,12 +13,12 @@ export default function AdminOrders() {
   const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0 })
 
   useEffect(() => {
-    loadOrders()
+    loadOrders(true)
   }, [pagination.page])
 
-  const loadOrders = async () => {
+  const loadOrders = async (showLoading = false) => {
     try {
-      setLoading(true)
+      if (showLoading) setLoading(true)
       setError('')
       const data = await api(`/orders/admin?page=${pagination.page}&limit=${pagination.limit}`)
       setOrders(data.items || [])
@@ -25,7 +26,7 @@ export default function AdminOrders() {
     } catch (err) {
       setError(err.message)
     } finally {
-      setLoading(false)
+      if (showLoading) setLoading(false)
     }
   }
 
@@ -71,6 +72,33 @@ export default function AdminOrders() {
     if (av > bv) return sort.dir === 'asc' ? 1 : -1
     return 0
   })
+
+  // Realtime subscriptions: update without reload
+  const handleOrderCreated = useCallback(({ order, user: u }) => {
+    // Only inject at top when viewing first page
+    if (pagination.page !== 1) return;
+    const enriched = {
+      id: order.id,
+      total_cents: order.total_cents,
+      status: order.status,
+      payment_method: order.payment_method,
+      payment_status: order.payment_status,
+      created_at: order.created_at,
+      user_id: order.user_id,
+      user_name: u?.name || `User #${order.user_id}`,
+      user_email: u?.email || '',
+      items: [], // filled by background silent refresh
+    };
+    setOrders(prev => [enriched, ...prev]);
+    // Silent refresh current page (no spinner) to fetch items aggregation
+    loadOrders(false);
+  }, [pagination.page])
+
+  const handleOrderUpdated = useCallback(({ order }) => {
+    setOrders(prev => prev.map(o => (o.id === order.id ? { ...o, ...order } : o)))
+  }, [])
+
+  useAdminRealtime({ token, onOrderCreated: handleOrderCreated, onOrderUpdated: handleOrderUpdated })
 
   if (user?.role !== 'admin') {
     return (
