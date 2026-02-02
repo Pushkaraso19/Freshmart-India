@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useCart } from '../context/CartContext.jsx'
-import { withAuth } from '../lib/api'
+import { withAuth, API_BASE_URL } from '../lib/api'
 import { useAuth } from '../context/AuthContext.jsx'
 
 export default function Shopping(){
@@ -166,8 +166,8 @@ export default function Shopping(){
       const formData = new FormData()
       formData.append('image', file)
 
-      const api = withAuth('')
-      const response = await fetch(`${api.toString().match(/.*(?=\/api)/)?.[0] || 'http://localhost:5000'}/api/products/search-by-image`, {
+      const baseUrl = API_BASE_URL || ''
+      const response = await fetch(`${baseUrl}/api/products/search-by-image`, {
         method: 'POST',
         body: formData
       })

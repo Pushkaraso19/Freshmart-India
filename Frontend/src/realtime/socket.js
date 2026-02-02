@@ -1,9 +1,10 @@
 import { io } from 'socket.io-client';
+import { API_BASE_URL } from '../lib/api';
 
 let socket;
 
 export function connectAdminSocket(token) {
-  const url = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || 'http://localhost:5000';
+  const url = API_BASE_URL || window.location.origin;
   // Reuse existing socket when possible
   if (socket && socket.connected) return socket;
 
