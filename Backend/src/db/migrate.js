@@ -45,9 +45,15 @@ async function migrate({ drop = false } = {}) {
 				mrp_cents INTEGER CHECK (mrp_cents >= 0),
 				is_veg BOOLEAN,
 				origin TEXT,
+				tags TEXT[] DEFAULT '{}'::text[],
 				created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 				updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 			);
+
+			-- Ensure tags column exists for older databases
+			ALTER TABLE products ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT '{}'::text[];
+			-- Index to speed up tag lookups
+			CREATE INDEX IF NOT EXISTS idx_products_tags_gin ON products USING gin (tags);
 
 			-- Addresses
 			CREATE TABLE IF NOT EXISTS addresses (

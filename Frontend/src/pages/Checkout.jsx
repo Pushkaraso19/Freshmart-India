@@ -10,7 +10,8 @@ export default function Checkout(){
   const api = withAuth(token)
   const navigate = useNavigate()
   const [currentStep, setCurrentStep] = useState(1)
-  const [paymentMethod, setPaymentMethod] = useState('cod')
+  const [paymentMethod, setPaymentMethod] = useState('online')
+  const [razorpayReady, setRazorpayReady] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [addresses, setAddresses] = useState([])
   const [shippingAddressId, setShippingAddressId] = useState(null)
@@ -88,12 +89,17 @@ export default function Checkout(){
   const handlePlaceOrder = async () => {
     setIsProcessing(true)
     try {
-      const body = { payment_method: paymentMethod, shipping_address_id: shippingAddressId }
-      const response = await api('/orders/place', { method: 'POST', body })
-      clearCart()
-      // Navigate to success page with order ID
-      const orderId = response.order?.id || response.id
-      navigate(`/order-success?orderId=${orderId}`)
+      if (paymentMethod === 'cod') {
+        // COD Flow - direct order placement
+        const body = { payment_method: paymentMethod, shipping_address_id: shippingAddressId }
+        const response = await api('/orders/place', { method: 'POST', body })
+        clearCart()
+        const orderId = response.order?.id || response.id
+        navigate(`/order-success?orderId=${orderId}`)
+      } else {
+        // Online Payment Flow - Razorpay
+        await handleRazorpayPayment()
+      }
     } catch (err) {
       alert(err.message || 'Failed to place order')
     } finally {
@@ -101,10 +107,123 @@ export default function Checkout(){
     }
   }
 
+  const handleRazorpayPayment = async () => {
+    if (!razorpayReady || typeof window === 'undefined' || typeof window.Razorpay === 'undefined') {
+      alert('Payment gateway is still loading. Please try again in a moment.')
+      return
+    }
+    try {
+      // Step 1: Create Razorpay order
+      const body = { shipping_address_id: shippingAddressId }
+      const response = await api('/payment/create-order', { method: 'POST', body })
+      
+      const { order } = response
+      
+      // Step 2: Load Razorpay checkout
+      const options = {
+        key: order.razorpay_key_id,
+        amount: order.amount,
+        currency: order.currency,
+        name: 'FreshMart',
+        description: 'Fresh Grocery Order',
+        order_id: order.razorpay_order_id,
+        handler: async function (response) {
+          // Step 3: Verify payment on backend
+          try {
+            const verifyData = {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature
+            }
+            const verifyResponse = await api('/payment/verify', { method: 'POST', body: verifyData })
+            
+            if (verifyResponse.success) {
+              clearCart()
+              navigate(`/order-success?orderId=${verifyResponse.order_id}`)
+            } else {
+              alert('Payment verification failed. Please contact support.')
+            }
+          } catch (err) {
+            console.error('Payment verification error:', err)
+            alert('Payment verification failed. Please contact support.')
+          }
+        },
+        prefill: {
+          name: user?.name || '',
+          email: user?.email || '',
+          contact: user?.phone || ''
+        },
+        theme: {
+          color: '#10b981'
+        },
+        modal: {
+          ondismiss: async function() {
+            // Handle payment cancellation
+            try {
+              await api('/payment/failure', { 
+                method: 'POST', 
+                body: { 
+                  razorpay_order_id: order.razorpay_order_id,
+                  error: 'Payment cancelled by user' 
+                }
+              })
+            } catch (err) {
+              console.error('Failed to record payment cancellation:', err)
+            }
+            alert('Payment cancelled')
+          }
+        }
+      }
+      
+      const rzp = new window.Razorpay(options)
+      rzp.on('payment.failed', async function (response) {
+        // Handle payment failure
+        try {
+          await api('/payment/failure', { 
+            method: 'POST', 
+            body: { 
+              razorpay_order_id: order.razorpay_order_id,
+              error: response.error.description 
+            }
+          })
+        } catch (err) {
+          console.error('Failed to record payment failure:', err)
+        }
+        alert(`Payment failed: ${response.error.description}`)
+      })
+      
+      rzp.open()
+    } catch (err) {
+      console.error('Razorpay payment error:', err)
+      throw err
+    }
+  }
+
+  // Load Razorpay script once and mark readiness
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.Razorpay) {
+      setRazorpayReady(true)
+      return
+    }
+
+    const script = document.createElement('script')
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js'
+    script.async = true
+    script.onload = () => setRazorpayReady(true)
+    script.onerror = () => setRazorpayReady(false)
+    document.body.appendChild(script)
+    
+    return () => {
+      document.body.removeChild(script)
+    }
+  }, [])
+
   const steps = [
     { number: 1, title: 'Cart Review' },
     { number: 2, title: 'Delivery Address' }
   ]
+
+  const placeOrderDisabled = isProcessing || (paymentMethod === 'online' && !razorpayReady)
 
   return (
     <section className="checkout-section">
@@ -338,18 +457,80 @@ export default function Checkout(){
                     </div>
                   </div>
                   
+                  {/* Payment Method Selection */}
+                  <div className="payment-method-section">
+                    <h3>Payment Method</h3>
+                    <div className="payment-options">
+                      <label className={`payment-option ${paymentMethod === 'online' ? 'selected' : ''}`}>
+                        <input 
+                          type="radio" 
+                          name="paymentMethod" 
+                          value="online"
+                          checked={paymentMethod === 'online'}
+                          onChange={(e) => setPaymentMethod(e.target.value)}
+                        />
+                        <div className="payment-option-content">
+                          <div className="payment-icon">
+                            <i className="fa fa-credit-card"></i>
+                          </div>
+                          <div className="payment-details">
+                            <strong>Online Payment</strong>
+                            <p>Pay securely using UPI, Card, Net Banking, or Wallet</p>
+                            <div className="payment-badges">
+                              <span className="badge">UPI</span>
+                              <span className="badge">Cards</span>
+                              <span className="badge">Wallets</span>
+                            </div>
+                          </div>
+                          {paymentMethod === 'online' && (
+                            <div className="selected-checkmark">
+                              <i className="fa fa-check-circle"></i>
+                            </div>
+                          )}
+                        </div>
+                      </label>
+                      
+                      <label className={`payment-option ${paymentMethod === 'cod' ? 'selected' : ''}`}>
+                        <input 
+                          type="radio" 
+                          name="paymentMethod" 
+                          value="cod"
+                          checked={paymentMethod === 'cod'}
+                          onChange={(e) => setPaymentMethod(e.target.value)}
+                        />
+                        <div className="payment-option-content">
+                          <div className="payment-icon">
+                            <i className="fa fa-money-bill-wave"></i>
+                          </div>
+                          <div className="payment-details">
+                            <strong>Cash on Delivery</strong>
+                            <p>Pay with cash when your order is delivered</p>
+                          </div>
+                          {paymentMethod === 'cod' && (
+                            <div className="selected-checkmark">
+                              <i className="fa fa-check-circle"></i>
+                            </div>
+                          )}
+                        </div>
+                      </label>
+                    </div>
+                    {paymentMethod === 'online' && !razorpayReady && (
+                      <p className="payment-loading-hint">Secure payment window is loading; you can place the order once ready.</p>
+                    )}
+                  </div>
+                  
                   <div className="step-buttons">
                     <button type="button" className="btn btn-secondary prev-step" onClick={prevStep}>
                       Back to Cart
                     </button>
-                    <button type="button" className="btn btn-primary next-step" onClick={handlePlaceOrder} disabled={isProcessing}>
+                    <button type="button" className="btn btn-primary next-step" onClick={handlePlaceOrder} disabled={placeOrderDisabled}>
                       {isProcessing ? (
                         <>
                           <i className="fa fa-spinner fa-spin"></i>
                           Processing...
                         </>
                       ) : (
-                        <>Place Order (Cash on Delivery)</>
+                        <>{paymentMethod === 'cod' ? 'Place Order (COD)' : (razorpayReady ? 'Proceed to Payment' : 'Preparing Payment...')}</>
                       )}
                     </button>
                   </div>

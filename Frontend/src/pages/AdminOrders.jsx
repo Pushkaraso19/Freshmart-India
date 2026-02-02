@@ -39,6 +39,43 @@ export default function AdminOrders() {
       setError(err.message)
     }
   }
+  
+  const handleRefund = async (order) => {
+    if (order.payment_method === 'cod' || !order.payment_method || order.payment_method === 'card' || order.payment_method === 'upi') {
+      alert('Only orders paid via online payment can be refunded')
+      return
+    }
+    
+    if (order.payment_status === 'refunded') {
+      alert('This order has already been refunded')
+      return
+    }
+    
+    if (order.payment_status !== 'paid') {
+      alert('Only paid orders can be refunded')
+      return
+    }
+    
+    const reason = prompt('Enter refund reason (optional):')
+    if (reason === null) return // User cancelled
+    
+    const confirmed = confirm(`Refund ₹${(order.total_cents / 100).toFixed(2)} to customer?\n\nOrder #${order.id}\nCustomer: ${order.user_name}`)
+    if (!confirmed) return
+    
+    try {
+      setError('')
+      setLoading(true)
+      const body = { reason, amount_cents: order.total_cents }
+      await api(`/payment/refund/${order.id}`, { method: 'POST', body })
+      alert('Refund processed successfully!')
+      loadOrders()
+    } catch (err) {
+      alert('Refund failed: ' + err.message)
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const filteredOrders = orders.filter(o => {
     const q = orderFilter.trim().toLowerCase()
@@ -148,15 +185,17 @@ export default function AdminOrders() {
                   <th style={{cursor:'pointer'}} onClick={() => toggleSort('id')}>ID{caret('id')}</th>
                   <th style={{cursor:'pointer'}} onClick={() => toggleSort('user_name')}>User{caret('user_name')}</th>
                   <th style={{cursor:'pointer'}} onClick={() => toggleSort('total_cents')}>Total{caret('total_cents')}</th>
+                  <th>Payment</th>
                   <th style={{cursor:'pointer'}} onClick={() => toggleSort('created_at')}>Created{caret('created_at')}</th>
                   <th>Items</th>
                   <th style={{cursor:'pointer'}} onClick={() => toggleSort('status')}>Status{caret('status')}</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredOrders.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="no-products">No orders found</td>
+                    <td colSpan="8" className="no-products">No orders found</td>
                   </tr>
                 ) : (
                   sortedOrders.map(o => (
@@ -169,6 +208,16 @@ export default function AdminOrders() {
                         </div>
                       </td>
                       <td>₹{(o.total_cents / 100).toFixed(2)}</td>
+                      <td>
+                        <div className="payment-info">
+                          <span className={`badge payment-method ${o.payment_method}`}>
+                            {o.payment_method === 'cod' ? 'COD' : o.payment_method.toUpperCase()}
+                          </span>
+                          <span className={`badge payment-status ${o.payment_status}`}>
+                            {o.payment_status}
+                          </span>
+                        </div>
+                      </td>
                       <td>{new Date(o.created_at).toLocaleString()}</td>
                       <td>
                         <details>
@@ -194,6 +243,24 @@ export default function AdminOrders() {
                               <option key={s} value={s}>{s}</option>
                             ))}
                           </select>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="order-actions">
+                          {o.payment_method === 'online' && o.payment_status === 'paid' && (
+                            <button 
+                              className="btn-refund"
+                              onClick={() => handleRefund(o)}
+                              title="Refund Payment"
+                            >
+                              <i className="fa fa-undo"></i> Refund
+                            </button>
+                          )}
+                          {o.payment_status === 'refunded' && (
+                            <span className="refunded-label">
+                              <i className="fa fa-check-circle"></i> Refunded
+                            </span>
+                          )}
                         </div>
                       </td>
                     </tr>

@@ -10,6 +10,11 @@ export default function Shopping(){
   const [searchQuery, setSearchQuery] = useState('')
   const [activeCategory, setActiveCategory] = useState('all')
   const [dietaryFilter, setDietaryFilter] = useState('all') 
+  const [selectedImage, setSelectedImage] = useState(null)
+  const [imagePreview, setImagePreview] = useState(null)
+  const [imageSearching, setImageSearching] = useState(false)
+  const [identifiedItems, setIdentifiedItems] = useState('')
+  const [isDragging, setIsDragging] = useState(false) 
 
   const [filteredProducts, setFilteredProducts] = useState([])
   const [allProducts, setAllProducts] = useState([])
@@ -110,6 +115,114 @@ export default function Shopping(){
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  const handleImageUpload = (e) => {
+    const file = e.target.files?.[0]
+    if (file && file.type.startsWith('image/')) {
+      setSelectedImage(file)
+      setImagePreview(URL.createObjectURL(file))
+      performImageSearch(file)
+    }
+  }
+
+  const handleDragEnter = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.currentTarget === e.target) {
+      setIsDragging(false)
+    }
+  }
+
+  const handleDragOver = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
+  const handleDrop = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+
+    const files = e.dataTransfer.files
+    if (files && files.length > 0) {
+      const file = files[0]
+      if (file.type.startsWith('image/')) {
+        setSelectedImage(file)
+        setImagePreview(URL.createObjectURL(file))
+        performImageSearch(file)
+      }
+    }
+  }
+
+  const performImageSearch = async (file) => {
+    setImageSearching(true)
+    setIdentifiedItems('')
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+
+      const api = withAuth('')
+      const response = await fetch(`${api.toString().match(/.*(?=\/api)/)?.[0] || 'http://localhost:5000'}/api/products/search-by-image`, {
+        method: 'POST',
+        body: formData
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to search by image')
+      }
+
+      const data = await response.json()
+      setIdentifiedItems(data.identified || '')
+      
+      if (data.items && data.items.length > 0) {
+        const items = data.items.map((p, idx) => ({
+          id: p.id,
+          name: p.name,
+          description: p.description || '',
+          brand: p.brand || '',
+          unit: p.unit || '',
+          category: p.category || 'General',
+          price: Math.round(Number(p.price_cents || 0) / 100),
+          mrp: p.mrp_cents ? Math.round(Number(p.mrp_cents) / 100) : null,
+          image: p.image_url || `/assets/image/product-${(idx % 8) + 1}.png`,
+          stock: Number(p.stock || 0),
+          inStock: Number(p.stock) > 0,
+          is_veg: p.is_veg,
+          origin: p.origin || '',
+        }))
+        setFilteredProducts(items)
+        setCurrentPage(1)
+        setActiveCategory('all')
+      } else {
+        setFilteredProducts([])
+      }
+    } catch (err) {
+      console.error('Image search error:', err)
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('toast', { 
+          detail: { message: err.message || 'Failed to search by image', type: 'error' } 
+        }))
+      }
+    } finally {
+      setImageSearching(false)
+    }
+  }
+
+  const clearImageSearch = () => {
+    setSelectedImage(null)
+    setImagePreview(null)
+    setIdentifiedItems('')
+    setSearchQuery('')
+    setActiveCategory('all')
+    setCurrentPage(1)
+  }
+
   const addToCart = async (product) => {
     addItem({ 
       id: product.id, 
@@ -206,22 +319,71 @@ export default function Shopping(){
                 </div>
               </div>
 
-              {/* Search */}
+              {/* Integrated Search */}
               <div className="control-section">
                 <h3>Search</h3>
                 <div className="control-list">
-                  <div className="search-control">
-                    <i className="fa fa-search"></i>
-                    <input 
-                      type="text" 
-                      placeholder="Search products..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                    {searchQuery && (
-                      <button onClick={() => setSearchQuery('')}>
-                        <i className="fa fa-times"></i>
-                      </button>
+                  <div 
+                    className={`integrated-search-control ${imagePreview ? 'has-image' : ''} ${isDragging ? 'dragging' : ''}`}
+                    onDragEnter={handleDragEnter}
+                    onDragLeave={handleDragLeave}
+                    onDragOver={handleDragOver}
+                    onDrop={handleDrop}
+                  >
+                    {imagePreview ? (
+                      <>
+                        <div className="search-image-preview">
+                          <img src={imagePreview} alt="Search" />
+                          {imageSearching && (
+                            <div className="search-spinner"></div>
+                          )}
+                        </div>
+                        <div className="search-image-info">
+                          {imageSearching ? (
+                            <span className="analyzing-text">Analyzing image...</span>
+                          ) : identifiedItems ? (
+                            <span className="detected-text">
+                              <i className="fa fa-check-circle"></i> {identifiedItems}
+                            </span>
+                          ) : (
+                            <span className="image-uploaded-text">Image uploaded</span>
+                          )}
+                        </div>
+                        <button 
+                          className="clear-search-btn"
+                          onClick={clearImageSearch}
+                          title="Clear image"
+                        >
+                          <i className="fa fa-times"></i>
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <i className="fa fa-search"></i>
+                        <input 
+                          type="text" 
+                          placeholder="Search products or drag & drop image..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                        {searchQuery && (
+                          <button 
+                            className="clear-search-btn"
+                            onClick={() => setSearchQuery('')}
+                          >
+                            <i className="fa fa-times"></i>
+                          </button>
+                        )}
+                        <label className="camera-upload-btn" title="Upload image">
+                          <input 
+                            type="file" 
+                            accept="image/*"
+                            onChange={handleImageUpload}
+                            style={{ display: 'none' }}
+                          />
+                          <i className="fa fa-camera"></i>
+                        </label>
+                      </>
                     )}
                   </div>
                 </div>

@@ -104,14 +104,15 @@ async function listOrders(req, res) {
 	try {
 		const { rows } = await pool.query(
 			`SELECT o.id, o.total_cents, o.status, o.payment_method, o.payment_status, o.created_at,
-							json_agg(json_build_object(
-								'product_id', oi.product_id, 
-								'quantity', oi.quantity, 
-								'price', oi.price,
-								'name', p.name,
-								'image', p.image_url,
-								'unit', p.unit
-							)) AS items
+						json_agg(json_build_object(
+							'product_id', oi.product_id, 
+							'quantity', oi.quantity, 
+							'price', oi.price,
+							'name', p.name,
+							'image', p.image_url,
+							'unit', p.unit,
+							'tags', COALESCE(p.tags, '{}')
+						)) AS items
 			 FROM orders o
 			 JOIN order_items oi ON oi.order_id = o.id
 			 JOIN products p ON p.id = oi.product_id
@@ -126,8 +127,6 @@ async function listOrders(req, res) {
 		res.status(500).json({ error: 'Failed to load orders' });
 	}
 }
-
-module.exports = { placeOrder, listOrders };
 
 // Admin: list all orders with user info and items (paginated)
 async function adminListOrders(req, res) {
@@ -144,7 +143,8 @@ async function adminListOrders(req, res) {
 								'price', oi.price,
 								'name', p.name,
 								'image', p.image_url,
-								'unit', p.unit
+								'unit', p.unit,
+								'tags', COALESCE(p.tags, '{}')
 							)
 			        ) FILTER (WHERE oi.id IS NOT NULL), '[]') AS items
 			 FROM orders o
@@ -210,9 +210,6 @@ async function adminUpdateOrder(req, res) {
 		res.status(500).json({ error: 'Failed to update order' });
 	}
 }
-
-module.exports.adminListOrders = adminListOrders;
-module.exports.adminUpdateOrder = adminUpdateOrder;
 
 // Customer: cancel own order (only if not shipped/delivered/cancelled)
 async function cancelOrder(req, res) {
@@ -295,4 +292,4 @@ async function cancelOrder(req, res) {
 	}
 }
 
-module.exports.cancelOrder = cancelOrder;
+module.exports = { placeOrder, listOrders, adminListOrders, adminUpdateOrder, cancelOrder };

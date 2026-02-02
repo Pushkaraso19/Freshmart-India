@@ -14,7 +14,7 @@ async function getCart(req, res) {
 	try {
 		const cartId = await getOrCreateCart(req.user.id);
 		const { rows: items } = await pool.query(
-			`SELECT ci.id, ci.product_id, p.name, p.image_url, p.price AS price_cents, p.unit, p.category, p.is_veg, ci.quantity,
+			`SELECT ci.id, ci.product_id, p.name, p.image_url, p.price AS price_cents, p.unit, p.category, p.is_veg, p.brand, p.origin, COALESCE(p.tags, '{}') as tags, ci.quantity,
 							(ci.quantity * p.price) AS line_total_cents
 			 FROM cart_items ci
 			 JOIN products p ON p.id = ci.product_id

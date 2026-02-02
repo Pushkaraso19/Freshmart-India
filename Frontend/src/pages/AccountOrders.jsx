@@ -45,7 +45,8 @@ export default function AccountOrders() {
     const icons = {
       card: 'fa-credit-card',
       upi: 'fa-mobile-alt',
-      cod: 'fa-money-bill-wave'
+      cod: 'fa-money-bill-wave',
+      online: 'fa-credit-card'
     }
     return icons[method] || 'fa-credit-card'
   }

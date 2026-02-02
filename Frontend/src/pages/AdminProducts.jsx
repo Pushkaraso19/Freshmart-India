@@ -10,6 +10,7 @@ export default function AdminProducts() {
   const [showForm, setShowForm] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [showArchived, setShowArchived] = useState('all') // default: show all products
   const [sort, setSort] = useState({ key: 'id', dir: 'asc' })
   const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0 })
   const [formData, setFormData] = useState({
@@ -23,18 +24,22 @@ export default function AdminProducts() {
     brand: '',
     mrp_rupees: '',
     is_veg: true,
-    origin: ''
+    origin: '',
+    tags: '',
+    is_active: true
   })
 
   useEffect(() => {
     loadProducts()
-  }, [pagination.page])
+  }, [pagination.page, showArchived])
 
   const loadProducts = async () => {
     try {
       setLoading(true)
       setError('')
-      const data = await api(`/products?page=${pagination.page}&limit=${pagination.limit}`)
+      const archivedParam = showArchived === 'inactive' ? 'only' : (showArchived === 'all' ? 'true' : '')
+      const url = `/products/admin/all?page=${pagination.page}&limit=${pagination.limit}${archivedParam ? '&archived=' + archivedParam : ''}`
+      const data = await api(url)
       setProducts(data.items || [])
       setPagination(prev => ({ ...prev, total: data.total || 0 }))
     } catch (err) {
@@ -54,6 +59,11 @@ export default function AdminProducts() {
     e.preventDefault()
     try {
       setError('')
+      const tagsArray = formData.tags
+        .split(',')
+        .map(t => t.trim())
+        .filter(t => t.length > 0)
+      
       const payload = {
         name: formData.name,
         description: formData.description || null,
@@ -65,7 +75,9 @@ export default function AdminProducts() {
         brand: formData.brand || null,
         mrp_cents: formData.mrp_rupees !== '' && Number.isFinite(parseFloat(formData.mrp_rupees)) ? Math.round(parseFloat(formData.mrp_rupees) * 100) : null,
         is_veg: !!formData.is_veg,
-        origin: formData.origin || null
+        origin: formData.origin || null,
+        tags: tagsArray.length > 0 ? tagsArray : null,
+        is_active: !!formData.is_active
       }
       if (payload.price_cents == null) throw new Error('Please enter a valid price in ₹')
 
@@ -94,7 +106,9 @@ export default function AdminProducts() {
         brand: '',
         mrp_rupees: '',
         is_veg: true,
-        origin: ''
+        origin: '',
+        tags: '',
+        is_active: true
       })
       loadProducts()
     } catch (err) {
@@ -104,6 +118,7 @@ export default function AdminProducts() {
 
   const handleEdit = (product) => {
     setEditingProduct(product)
+    const tagsString = Array.isArray(product.tags) ? product.tags.join(', ') : ''
     setFormData({
       name: product.name,
       description: product.description || '',
@@ -115,16 +130,38 @@ export default function AdminProducts() {
       brand: product.brand || '',
       mrp_rupees: product.mrp_cents != null ? (product.mrp_cents / 100).toFixed(2) : '',
       is_veg: product.is_veg == null ? true : !!product.is_veg,
-      origin: product.origin || ''
+      origin: product.origin || '',
+      tags: tagsString,
+      is_active: product.is_active == null ? true : !!product.is_active
     })
     setShowForm(true)
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Are you sure you want to delete this product?')) return
+    if (!confirm('Are you sure you want to permanently delete this product? This may fail if the product has been ordered.')) return
     try {
       setError('')
       await api(`/products/${id}`, { method: 'DELETE' })
+      loadProducts()
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  const handleArchive = async (id) => {
+    try {
+      setError('')
+      await api(`/products/${id}/archive`, { method: 'PATCH' })
+      loadProducts()
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  const handleRestore = async (id) => {
+    try {
+      setError('')
+      await api(`/products/${id}/restore`, { method: 'PATCH' })
       loadProducts()
     } catch (err) {
       setError(err.message)
@@ -145,7 +182,9 @@ export default function AdminProducts() {
       brand: '',
       mrp_rupees: '',
       is_veg: true,
-      origin: ''
+      origin: '',
+      tags: '',
+      is_active: true
     })
   }
 
@@ -360,9 +399,54 @@ export default function AdminProducts() {
                   placeholder="e.g., Nashik, India"
                 />
               </div>
-              <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <input type="checkbox" id="is_veg" name="is_veg" checked={!!formData.is_veg} onChange={handleInputChange} />
-                <label htmlFor="is_veg" style={{ margin: 0 }}>Vegetarian (Veg)</label>
+              <div className="form-group">
+                <label htmlFor="tags">Tags</label>
+                <input
+                  type="text"
+                  id="tags"
+                  name="tags"
+                  value={formData.tags}
+                  onChange={handleInputChange}
+                  placeholder="e.g., fresh, organic, local (comma-separated)"
+                />
+              </div>
+              <div className="form-group switch-group">
+                <label className="switch-toggle">
+                  <input
+                    type="checkbox"
+                    id="is_veg"
+                    name="is_veg"
+                    className="switch-input"
+                    checked={!!formData.is_veg}
+                    onChange={handleInputChange}
+                  />
+                  <span className="switch-track">
+                    <span className="switch-thumb"></span>
+                  </span>
+                  <span className="switch-text">
+                    <span className="state-on">Veg</span>
+                    <span className="state-off">Non-Veg</span>
+                  </span>
+                </label>
+              </div>
+              <div className="form-group switch-group">
+                <label className="switch-toggle">
+                  <input
+                    type="checkbox"
+                    id="is_active"
+                    name="is_active"
+                    className="switch-input"
+                    checked={!!formData.is_active}
+                    onChange={handleInputChange}
+                  />
+                  <span className="switch-track">
+                    <span className="switch-thumb"></span>
+                  </span>
+                  <span className="switch-text">
+                    <span className="state-on">Active</span>
+                    <span className="state-off">Inactive</span>
+                  </span>
+                </label>
               </div>
             </div>
 
@@ -386,6 +470,14 @@ export default function AdminProducts() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
+          <div className="archive-filter">
+            <label>Show: </label>
+            <select value={showArchived} onChange={(e) => setShowArchived(e.target.value)}>
+              <option value="active">Active Products</option>
+              <option value="inactive">Inactive Products</option>
+              <option value="all">All Products</option>
+            </select>
+          </div>
         </div>
 
         {loading ? (
@@ -401,13 +493,14 @@ export default function AdminProducts() {
                   <th style={{cursor:'pointer'}} onClick={() => toggleSort('category')}>Category{caret('category')}</th>
                   <th style={{cursor:'pointer'}} onClick={() => toggleSort('price_cents')}>Price{caret('price_cents')}</th>
                   <th style={{cursor:'pointer'}} onClick={() => toggleSort('stock')}>Stock{caret('stock')}</th>
+                  <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredProducts.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="no-products">No products found</td>
+                    <td colSpan="8" className="no-products">No products found</td>
                   </tr>
                 ) : (
                   sortedProducts.map(product => (
@@ -446,6 +539,9 @@ export default function AdminProducts() {
                           {product.is_veg === true && <span className="veg-badge">Veg</span>}
                           {product.is_veg === false && <span className="nonveg-badge">Non-Veg</span>}
                           {product.origin && <span className="origin-badge">{product.origin}</span>}
+                          {product.tags && Array.isArray(product.tags) && product.tags.map((tag, idx) => (
+                            <span key={idx} className="tag-badge">{tag}</span>
+                          ))}
                         </div>
                       </td>
                       <td>
@@ -454,21 +550,53 @@ export default function AdminProducts() {
                         </span>
                       </td>
                       <td>
+                        {product.is_active ? (
+                          <span className="status-badge status-active">Active</span>
+                        ) : (
+                          <span className="status-badge status-archived">Inactive</span>
+                        )}
+                      </td>
+                      <td>
                         <div className="action-buttons">
                           <button 
                             className="btn-action btn-edit" 
                             onClick={() => handleEdit(product)}
                             title="Edit product"
+                            disabled={!product.is_active}
                           >
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                             </svg>
                           </button>
+                          {product.is_active ? (
+                            <button 
+                              className="btn-action btn-archive" 
+                              onClick={() => handleArchive(product.id)}
+                              title="Mark as inactive"
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <polyline points="21 8 21 21 3 21 3 8"></polyline>
+                                <rect x="1" y="3" width="22" height="5"></rect>
+                                <line x1="10" y1="12" x2="14" y2="12"></line>
+                              </svg>
+                            </button>
+                          ) : (
+                            <button 
+                              className="btn-action btn-restore" 
+                              onClick={() => handleRestore(product.id)}
+                              title="Mark as active"
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                              </svg>
+                            </button>
+                          )}
                           <button 
                             className="btn-action btn-delete" 
                             onClick={() => handleDelete(product.id)}
-                            title="Delete product"
+                            title="Delete product permanently"
                           >
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                               <polyline points="3 6 5 6 21 6"></polyline>

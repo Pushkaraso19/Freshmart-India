@@ -2,7 +2,7 @@
 
 .shopping-page {
   min-height: 100vh;
-  background: #fafafa;
+  background: linear-gradient(135deg, #f5f7fa 0%, #f8fafc 50%, #f0fdf4 100%);
 }
 
 .container {
@@ -15,7 +15,12 @@
 .shopping-header {
   padding: 2rem 0;
   border-bottom: 1px solid #e5e7eb;
-  background: white;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .header-content {
@@ -161,7 +166,163 @@
   transform: scale(1.1);
 }
 
-/* Search Control - Minimalist Design */
+/* Integrated Search Control */
+.integrated-search-control {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 0 0.5rem 0 1.5rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  width: 100%;
+  max-width: 700px;
+  min-height: 48px;
+  gap: 0.75rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.integrated-search-control:hover {
+  border-color: #d1d5db;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.integrated-search-control:focus-within {
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.integrated-search-control.dragging {
+  border-color: #667eea;
+  border-style: dashed;
+  background: linear-gradient(135deg, #f0f4ff 0%, #e0e7ff 100%);
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
+}
+
+.integrated-search-control.has-image {
+  background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+  border-color: #86efac;
+}
+
+.integrated-search-control > i.fa-search {
+  color: #6b7280;
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.integrated-search-control input {
+  border: none;
+  background: transparent;
+  outline: none;
+  flex: 1;
+  font-size: 1rem;
+  color: #111827;
+  font-weight: 400;
+  min-width: 0;
+}
+
+.integrated-search-control input::placeholder {
+  color: #9ca3af;
+}
+
+/* Search Image Preview in Search Bar */
+.search-image-preview {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: white;
+  border: 2px solid #86efac;
+}
+
+.search-image-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.search-spinner {
+  display: none;
+}
+
+.analyzing-text {
+  color: #10b981;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.detected-text {
+  color: #059669;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.detected-text i {
+  flex-shrink: 0;
+  color: #10b981;
+}
+
+.image-uploaded-text {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.clear-search-btn {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 0.5rem;
+  transition: all 0.2s ease;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.clear-search-btn:hover {
+  color: #ef4444;
+  background: #fef2f2;
+}
+
+.camera-upload-btn {
+  background: transparent;
+  border: none;
+  color: #000000;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.2s ease;
+  font-size: 1.525rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  margin-left: auto;
+}
+
+.camera-upload-btn:hover {
+  background: transparent;
+  color: #10b981;
+  border-color: transparent;
+  transform: scale(1.1);
+}
+
+/* Old search control styles kept for compatibility */
 .search-control {
   position: relative;
   display: flex;
@@ -220,6 +381,246 @@
 .search-control button:hover {
   color: #111827;
   background: #f3f4f6;
+}
+
+/* Legacy Image Search Styles - Hidden (kept for reference) 
+.image-search-btn {
+  padding: 0 1rem;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 40px;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.image-search-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.image-search-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+  max-width: 380px;
+}
+
+.image-upload-area {
+  position: relative;
+  border: 3px dashed #cbd5e0;
+  border-radius: 16px;
+  padding: 2rem;
+  background: linear-gradient(135deg, #ffffff 0%, #f7fafc 100%);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.image-upload-area:hover {
+  border-color: #667eea;
+  background: linear-gradient(135deg, #f0f4ff 0%, #e0e7ff 100%);
+  transform: scale(1.02);
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.15);
+}
+
+.image-upload-area.dragging {
+  border-color: #667eea;
+  border-style: solid;
+  background: linear-gradient(135deg, #e0e7ff 0%, #dbeafe 100%);
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1), 0 12px 32px rgba(102, 126, 234, 0.2);
+  transform: scale(1.03);
+}
+
+.upload-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  text-align: center;
+  color: #4b5563;
+  width: 100%;
+}
+
+.upload-icon {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  width: 80px;
+  height: 80px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.upload-label:hover .upload-icon {
+  transform: scale(1.1) rotate(5deg);
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+}
+
+.upload-icon i {
+  color: white;
+}
+
+.upload-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.upload-subtitle {
+  margin: 0;
+  font-size: 0.813rem;
+  font-weight: 400;
+  color: #6b7280;
+}
+*/
+
+/* Modern Integrated Search replaces the above */
+
+.image-preview {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.image-preview img {
+  width: 100%;
+  height: auto;
+  max-height: 250px;
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.change-image-btn {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 0.813rem;
+  font-weight: 600;
+  color: #4b5563;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  backdrop-filter: blur(10px);
+}
+
+.change-image-btn:hover {
+  background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+.searching-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  border-radius: 12px;
+}
+
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid #e5e7eb;
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.searching-overlay p {
+  margin: 0;
+  color: #4b5563;
+  font-size: 0.938rem;
+  font-weight: 600;
+}
+
+.identified-items {
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+  border: 2px solid #86efac;
+  border-radius: 12px;
+  padding: 1rem;
+  font-size: 0.875rem;
+  color: #166534;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.15);
+}
+
+.identified-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: #059669;
+}
+
+.identified-header i {
+  color: #10b981;
+  font-size: 1rem;
+}
+
+.identified-content {
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.clear-image-btn {
+  padding: 0 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: white;
+  color: #6b7280;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 40px;
+}
+
+.clear-image-btn:hover {
+  background: #f3f4f6;
+  color: #111827;
+  border-color: #d1d5db;
 }
 
 /* Sort Select */
@@ -281,25 +682,25 @@
 .product-card {
   background: white;
   border: 1px solid #e2e8f0;
-  border-radius: 12px;
+  border-radius: 16px;
   overflow: hidden;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   height: fit-content;
 }
 
 .product-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-  border-color: #cbd5e0;
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+  border-color: var(--primary);
 }
 
 .product-image {
   position: relative;
   width: 100%;
-  height: 160px;
+  height: 180px;
   overflow: hidden;
-  background: #f7fafc;
+  background: linear-gradient(135deg, #f7fafc 0%, #f0f4ff 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -309,24 +710,35 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.3s ease;
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .product-card:hover .product-image img {
-  transform: scale(1.03);
+  transform: scale(1.08);
 }
 
 .product-badge.discount-badge {
   position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  background: #f59e0b;
+  top: 0.75rem;
+  right: 0.75rem;
+  background: linear-gradient(135deg, #f59e0b 0%, #dc2626 100%);
   color: white;
-  padding: 0.25rem 0.5rem;
-  border-radius: 8px;
-  font-size: 0.8rem;
-  font-weight: 600;
+  padding: 0.375rem 0.625rem;
+  border-radius: 10px;
+  font-size: 0.813rem;
+  font-weight: 700;
   z-index: 2;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
 }
 
 .out-of-stock-overlay {
@@ -668,6 +1080,20 @@
   .dietary-option {
     font-size: 0.8125rem;
     padding: 0.375rem 0.625rem;
+  }
+
+  .integrated-search-control {
+    max-width: 100%;
+  }
+
+  .search-image-info {
+    font-size: 0.75rem;
+  }
+
+  .camera-upload-btn {
+    width: 28px;
+    height: 28px;
+    padding: 0.375rem;
   }
 
   .products-grid {
